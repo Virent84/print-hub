@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Owner Dashboard</title>
+</head>
+<body>
+
+<h1>Orders for {{ owner }}</h1>
+
+{% if orders %}
+    <table border="1" cellpadding="10">
+        <tr>
+            <th>Customer</th>
+            <th>File</th>
+            <th>Print Type</th>
+            <th>Copies</th>
+            <th>Price (₹)</th>
+        </tr>
+
+        {% for order in orders %}
+        <tr>
+            <td>{{ order.customer }}</td>
+            <td>{{ order.file }}</td>
+            <td>{{ order.print_type }}</td>
+            <td>{{ order.copies }}</td>
+            <td>{{ order.price }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+{% else %}
+    <p>No orders yet.</p>
+{% endif %}
+
+<br>
+<a href="/">Back to Home</a>
+
+</body>
+</html>

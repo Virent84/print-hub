@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Upload Files</title>
+</head>
+<body>
+
+    <h1>Customer Upload Page</h1>
+
+ <form method="post" enctype="multipart/form-data">
+    
+    <!-- 🔥 KEEP OWNER DURING POST -->
+    <input type="hidden" name="owner" value="{{ owner }}">
+
+    <label>Name:</label><br>
+    <input type="text" name="customer_name" required><br><br>
+
+    <label>Select file:</label><br>
+    <input type="file" name="document" required><br><br>
+
+    <label>Copies:</label><br>
+    <input type="number" name="copies" min="1" value="1" required><br><br>
+
+    <label>Print type:</label><br>
+    <select name="print_type">
+        <option value="bw">Black & White</option>
+        <option value="color">Color</option>
+    </select><br><br>
+
+    <button type="submit">Upload</button>
+</form>
+
+
+
+    <br>
+    <a href="/">Back to Home</a>
+
+</body>
+</html>
