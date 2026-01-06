@@ -5,9 +5,9 @@ import qrcode
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 
-# ==================================================
+# --------------------------------------------------
 # APP CONFIG
-# ==================================================
+# --------------------------------------------------
 app = Flask(__name__)
 
 DB_NAME = "printhub.db"
@@ -17,243 +17,276 @@ QR_FOLDER = "static/qrcodes"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(QR_FOLDER, exist_ok=True)
 
-# ==================================================
+# --------------------------------------------------
 # DATABASE
-# ==================================================
-def get_db():
+# --------------------------------------------------
+def get_db_connection():
     conn = sqlite3.connect(DB_NAME, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
-    conn = get_db()
+    conn = get_db_connection()
     c = conn.cursor()
 
     c.execute("""
-    CREATE TABLE IF NOT EXISTS owners (
-        username TEXT PRIMARY KEY,
-        password TEXT,
-        bw_price INTEGER,
-        color_price INTEGER,
-        upi_id TEXT,
-        subscription_status TEXT,
-        trial_end TEXT
-    )
+        CREATE TABLE IF NOT EXISTS owners (
+            username TEXT PRIMARY KEY,
+            password TEXT,
+            bw_price INTEGER,
+            color_price INTEGER,
+            upi_id TEXT,
+            subscription_status TEXT,
+            trial_end TEXT
+        )
     """)
 
     c.execute("""
-    CREATE TABLE IF NOT EXISTS orders (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        owner TEXT,
-        customer_name TEXT,
-        filename TEXT,
-        copies INTEGER,
-        print_type TEXT,
-        amount INTEGER,
-        status TEXT,
-        created_at TEXT
-    )
+        CREATE TABLE IF NOT EXISTS orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            owner TEXT,
+            customer_name TEXT,
+            filename TEXT,
+            copies INTEGER,
+            print_type TEXT,
+            amount INTEGER,
+            status TEXT
+        )
     """)
 
     conn.commit()
     conn.close()
 
 def migrate_db():
-    conn = get_db()
+    conn = get_db_connection()
     c = conn.cursor()
-    for col in ["subscription_status", "trial_end"]:
-        try:
-            c.execute(f"ALTER TABLE owners ADD COLUMN {col} TEXT")
-        except:
-            pass
+
+    try:
+        c.execute("ALTER TABLE owners ADD COLUMN subscription_status TEXT")
+    except:
+        pass
+
+    try:
+        c.execute("ALTER TABLE owners ADD COLUMN trial_end TEXT")
+    except:
+        pass
+
     conn.commit()
     conn.close()
 
+# MUST run on startup (Render / Gunicorn safe)
 init_db()
 migrate_db()
 
-# ==================================================
+# --------------------------------------------------
 # QR GENERATION
-# ==================================================
-def generate_qr(owner):
-    url = f"{request.host_url.rstrip('/')}/upload?owner={owner}"
+# --------------------------------------------------
+def generate_owner_qr(owner):
+    base_url = request.host_url.rstrip("/")
+    url = f"{base_url}/upload?owner={owner}"
+
     path = f"{QR_FOLDER}/{owner}.png"
     qrcode.make(url).save(path)
     return path
 
-# ==================================================
-# HOME
-# ==================================================
+# --------------------------------------------------
+# ROUTES
+# --------------------------------------------------
+
 @app.route("/")
 def home():
     return """
     <h1>PrintHub</h1>
-    <p>Xerox Automation SaaS</p>
-    <a href="/register">Register Shop</a> |
+    <p>QR-based Xerox Automation SaaS</p>
+    <a href="/register_owner">Register Shop</a> |
     <a href="/login">Owner Login</a>
     """
 
-# ==================================================
-# REGISTER OWNER
-# ==================================================
-@app.route("/register", methods=["GET","POST"])
-def register():
+# --------------------------------------------------
+# OWNER REGISTRATION
+# --------------------------------------------------
+@app.route("/register_owner", methods=["GET", "POST"])
+def register_owner():
     if request.method == "POST":
-        username = request.form["username"]
-        password = generate_password_hash(request.form["password"])
-        bw = int(request.form["bw_price"])
-        color = int(request.form["color_price"])
-        upi = request.form["upi_id"]
+        username = request.form.get("username")
+        raw_password = request.form.get("password")
+        bw_price = int(request.form.get("bw_price"))
+        color_price = int(request.form.get("color_price"))
+        upi_id = request.form.get("upi_id")
 
+        password = generate_password_hash(raw_password)
         trial_end = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
 
         try:
-            conn = get_db()
+            conn = get_db_connection()
             conn.execute(
-                "INSERT INTO owners VALUES (?,?,?,?,?,?,?)",
-                (username, password, bw, color, upi, "TRIAL", trial_end)
+                "INSERT INTO owners VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (username, password, bw_price, color_price, upi_id, "TRIAL", trial_end)
             )
             conn.commit()
             conn.close()
-        except:
-            return "<h3>Owner already exists</h3>"
+        except sqlite3.IntegrityError:
+            return "<h3>Owner already exists ❌</h3>"
 
-        qr = generate_qr(username)
+        qr_path = generate_owner_qr(username)
+
         return f"""
-        <h2>Shop Registered</h2>
-        <p>Trial till: {trial_end}</p>
-        <img src='/{qr}' width='200'><br><br>
-        <a href="/login">Login</a>
+        <h2>Shop Registered ✅</h2>
+        <p>Free Trial till: <b>{trial_end}</b></p>
+        <p>Customer QR:</p>
+        <img src='/{qr_path}' width='200'><br><br>
+        <a href="/login"><button>Owner Login</button></a>
         """
 
     return """
-    <h2>Register Shop</h2>
+    <h2>Register Xerox Shop</h2>
     <form method="POST">
-        Username:<br><input name="username" required><br>
-        Password:<br><input type="password" name="password" required><br>
-        BW Price:<br><input type="number" name="bw_price" required><br>
-        Color Price:<br><input type="number" name="color_price" required><br>
+        Username:<br><input name="username" required><br><br>
+        Password:<br><input type="password" name="password" required><br><br>
+        B/W Price:<br><input type="number" name="bw_price" required><br><br>
+        Color Price:<br><input type="number" name="color_price" required><br><br>
         UPI ID:<br><input name="upi_id" required><br><br>
-        <button>Register</button>
+        <button type="submit">Register</button>
     </form>
     """
 
-# ==================================================
-# LOGIN
-# ==================================================
-@app.route("/login", methods=["GET","POST"])
+# --------------------------------------------------
+# OWNER LOGIN
+# --------------------------------------------------
+@app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        u = request.form["username"]
-        p = request.form["password"]
+        username = request.form.get("username")
+        password = request.form.get("password")
 
-        conn = get_db()
+        conn = get_db_connection()
         owner = conn.execute(
-            "SELECT * FROM owners WHERE username=?", (u,)
+            "SELECT * FROM owners WHERE username=?",
+            (username,)
         ).fetchone()
         conn.close()
 
-        if not owner or not check_password_hash(owner["password"], p):
-            return "<h3>Invalid login</h3>"
+        if not owner or not check_password_hash(owner["password"], password):
+            return "<h3>Invalid login ❌</h3>"
 
-        return redirect(f"/dashboard/{u}")
+        return redirect(f"/dashboard/{username}")
 
     return """
     <h2>Owner Login</h2>
     <form method="POST">
-        Username:<br><input name="username" required><br>
+        Username:<br><input name="username" required><br><br>
         Password:<br><input type="password" name="password" required><br><br>
-        <button>Login</button>
+        <button type="submit">Login</button>
     </form>
     """
 
-# ==================================================
+# --------------------------------------------------
 # CUSTOMER UPLOAD
-# ==================================================
-@app.route("/upload", methods=["GET","POST"])
+# --------------------------------------------------
+@app.route("/upload", methods=["GET", "POST"])
 def upload():
     owner = request.args.get("owner")
     if not owner:
-        return "<h3>Invalid QR</h3>"
+        return "<h3>Invalid QR ❌</h3>"
 
-    conn = get_db()
-    shop = conn.execute(
-        "SELECT * FROM owners WHERE username=?", (owner,)
+    conn = get_db_connection()
+    owner_data = conn.execute(
+        "SELECT * FROM owners WHERE username=?",
+        (owner,)
     ).fetchone()
     conn.close()
 
-    if not shop:
-        return "<h3>Shop not found</h3>"
+    if not owner_data:
+        return "<h3>Owner not found ❌</h3>"
 
     if request.method == "POST":
-        name = request.form["name"]
-        copies = int(request.form["copies"])
-        ptype = request.form["print_type"]
-        file = request.files["file"]
+        name = request.form.get("name")
+        copies = int(request.form.get("copies"))
+        print_type = request.form.get("print_type")
+        file = request.files.get("file")
 
-        path = os.path.join(UPLOAD_FOLDER, file.filename)
-        file.save(path)
+        if not file:
+            return "<h3>No file uploaded ❌</h3>"
 
-        price = shop["bw_price"] if ptype=="bw" else shop["color_price"]
+        filepath = os.path.join(UPLOAD_FOLDER, file.filename)
+        file.save(filepath)
+
+        price = owner_data["bw_price"] if print_type == "bw" else owner_data["color_price"]
         total = price * copies
 
-        conn = get_db()
+        conn = get_db_connection()
         conn.execute("""
             INSERT INTO orders
-            (owner, customer_name, filename, copies, print_type, amount, status, created_at)
-            VALUES (?,?,?,?,?,?,?,?)
-        """, (owner, name, file.filename, copies, ptype, total, "CREATED",
-              datetime.now().strftime("%Y-%m-%d %H:%M")))
+            (owner, customer_name, filename, copies, print_type, amount, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (owner, name, file.filename, copies, print_type, total, "CREATED"))
         conn.commit()
         conn.close()
 
         return f"""
         <h2>Payment</h2>
         <p>Amount: ₹{total}</p>
-        <p>Pay to UPI: {shop['upi_id']}</p>
-        <p>Owner will confirm payment</p>
+        <p>Pay via UPI: {owner_data['upi_id']}</p>
+        <p><b>Payment confirmed manually by shop</b></p>
         """
 
     return f"""
     <h2>Upload for {owner}</h2>
     <form method="POST" enctype="multipart/form-data">
-        Name:<br><input name="name" required><br>
-        File:<br><input type="file" name="file" required><br>
-        Copies:<br><input type="number" name="copies" value="1"><br>
+        Name:<br><input name="name" required><br><br>
+        File:<br><input type="file" name="file" required><br><br>
+        Copies:<br><input type="number" name="copies" value="1" min="1"><br><br>
         Type:<br>
         <select name="print_type">
             <option value="bw">B/W</option>
             <option value="color">Color</option>
         </select><br><br>
-        <button>Upload</button>
+        <button type="submit">Upload</button>
     </form>
     """
 
-# ==================================================
-# DASHBOARD (SUBSCRIPTION + ORDERS)
-# ==================================================
+# --------------------------------------------------
+# DASHBOARD (SUBSCRIPTION CHECK)
+# --------------------------------------------------
 @app.route("/dashboard/<owner>")
 def dashboard(owner):
-    conn = get_db()
-    shop = conn.execute(
-        "SELECT * FROM owners WHERE username=?", (owner,)
+    conn = get_db_connection()
+    owner_data = conn.execute(
+        "SELECT * FROM owners WHERE username=?",
+        (owner,)
     ).fetchone()
 
     today = datetime.now().strftime("%Y-%m-%d")
-    if shop["subscription_status"] != "ACTIVE" and today > shop["trial_end"]:
+
+    if owner_data["subscription_status"] != "ACTIVE" and today > owner_data["trial_end"]:
         conn.close()
         return f"""
-        <h2>Trial Expired</h2>
-        <a href="/subscribe/{owner}">Subscribe ₹199/month</a>
+        <h2>Trial Expired ❌</h2>
+        <p>Your free trial has ended.</p>
+        <a href="/subscribe/{owner}">
+            <button>Subscribe ₹199/month</button>
+        </a>
         """
 
     orders = conn.execute(
-        "SELECT * FROM orders WHERE owner=? ORDER BY id DESC", (owner,)
+        "SELECT * FROM orders WHERE owner=? ORDER BY id DESC",
+        (owner,)
     ).fetchall()
     conn.close()
 
-    html = f"<h2>Dashboard – {owner}</h2><table border=1>"
-    html += "<tr><th>ID</th><th>Customer</th><th>File</th><th>Amount</th><th>Status</th><th>Action</th></tr>"
+    html = f"<h2>Dashboard – {owner}</h2><hr>"
+
+    if not orders:
+        return html + "<p>No orders yet.</p>"
+
+    html += """
+    <table border="1" cellpadding="8">
+        <tr>
+            <th>ID</th><th>Customer</th><th>File</th>
+            <th>Copies</th><th>Type</th><th>Amount</th>
+            <th>Status</th><th>Update</th>
+        </tr>
+    """
 
     for o in orders:
         html += f"""
@@ -261,56 +294,64 @@ def dashboard(owner):
             <td>{o['id']}</td>
             <td>{o['customer_name']}</td>
             <td>{o['filename']}</td>
+            <td>{o['copies']}</td>
+            <td>{o['print_type']}</td>
             <td>₹{o['amount']}</td>
             <td>{o['status']}</td>
             <td>
                 <a href="/status/{o['id']}/PAID">PAID</a> |
-                <a href="/status/{o['id']}/PRINTING">PRINT</a> |
+                <a href="/status/{o['id']}/PRINTING">PRINTING</a> |
                 <a href="/status/{o['id']}/READY">READY</a> |
                 <a href="/status/{o['id']}/COMPLETED">DONE</a>
             </td>
         </tr>
         """
 
-    return html + "</table>"
+    html += "</table>"
+    return html
 
-# ==================================================
+# --------------------------------------------------
 # SUBSCRIPTION
-# ==================================================
+# --------------------------------------------------
 @app.route("/subscribe/<owner>")
 def subscribe(owner):
     return f"""
-    <h2>PrintHub Pro</h2>
+    <h2>Upgrade Subscription</h2>
+    <p>Plan: PrintHub Pro</p>
     <p>₹199 / month</p>
-    <a href="/activate/{owner}">I Have Paid</a>
+    <a href="/activate/{owner}">
+        <button>I Have Paid</button>
+    </a>
     """
 
 @app.route("/activate/<owner>")
 def activate(owner):
-    conn = get_db()
+    conn = get_db_connection()
     conn.execute(
-        "UPDATE owners SET subscription_status='ACTIVE' WHERE username=?", (owner,)
+        "UPDATE owners SET subscription_status='ACTIVE' WHERE username=?",
+        (owner,)
     )
     conn.commit()
     conn.close()
     return redirect(f"/dashboard/{owner}")
 
-# ==================================================
-# ORDER STATUS
-# ==================================================
-@app.route("/status/<int:oid>/<status>")
-def status(oid, status):
-    conn = get_db()
+# --------------------------------------------------
+# STATUS UPDATE
+# --------------------------------------------------
+@app.route("/status/<int:order_id>/<new_status>")
+def update_status(order_id, new_status):
+    conn = get_db_connection()
     conn.execute(
-        "UPDATE orders SET status=? WHERE id=?", (status, oid)
+        "UPDATE orders SET status=? WHERE id=?",
+        (new_status, order_id)
     )
     conn.commit()
     conn.close()
     return redirect(request.referrer)
 
-# ==================================================
+# --------------------------------------------------
 # RUN
-# ==================================================
+# --------------------------------------------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
