@@ -37,6 +37,7 @@ def init_db():
 # APP CONFIG
 # ------------------------------------
 app = Flask(__name__)
+init_db()
 app.secret_key = "printhub_secret_key"
 
 UPLOAD_FOLDER = os.path.join(os.getcwd(), "uploads")
@@ -320,8 +321,5 @@ def generate_upi_qr(owner, amount):
 # START
 # ------------------------------------
 if __name__ == "__main__":
-    init_db()
-    app.run()
-
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=port)
