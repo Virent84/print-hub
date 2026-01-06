@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for
 import sqlite3
 import os
 import qrcode
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # -------------------- APP SETUP --------------------
 
@@ -76,7 +77,10 @@ def home():
 def register_owner():
     if request.method == "POST":
         username = request.form.get("username")
-        password = request.form.get("password")
+        
+        raw_password = request.form.get("password")
+        password = generate_password_hash(raw_password)
+
         bw_price = request.form.get("bw_price")
         color_price = request.form.get("color_price")
         upi_id = request.form.get("upi_id")
@@ -121,13 +125,14 @@ def login():
 
         conn = get_db_connection()
         owner = conn.execute(
-            "SELECT * FROM owners WHERE username=? AND password=?",
-            (username, password)
+        "SELECT * FROM owners WHERE username=?",
+        (username,)
         ).fetchone()
 
-        if not owner:
+        if not owner or not check_password_hash(owner["password"], password):
             conn.close()
             return "<h3>Invalid username or password ❌</h3>"
+
 
         orders = conn.execute(
             "SELECT * FROM orders WHERE owner=? ORDER BY id DESC",
