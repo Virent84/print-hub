@@ -1,28 +1,23 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Customer Upload</title>
+    <title>Upload Files</title>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <h2>Customer Upload Page</h2>
+<div class="container">
+    <h2>Upload for {{ owner }}</h2>
 
     <form method="POST" enctype="multipart/form-data">
-        <label>Name:</label><br>
-        <input type="text" name="name" required><br><br>
-
-        <label>Select file:</label><br>
-        <input type="file" name="file" required><br><br>
-
-        <label>Number of copies:</label><br>
-        <input type="number" name="copies" min="1" value="1" required><br><br>
-
-        <label>Print type:</label><br>
+        <input name="name" placeholder="Your Name" required>
+        <input type="file" name="file" required>
+        <input type="number" name="copies" value="1" min="1">
         <select name="print_type">
-            <option value="bw">Black & White</option>
+            <option value="bw">B/W</option>
             <option value="color">Color</option>
-        </select><br><br>
-
-        <button type="submit">Upload & Continue</button>
+        </select>
+        <button>Upload</button>
     </form>
+</div>
 </body>
 </html>
