@@ -1,18 +1,14 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Login</title>
-    <link rel="stylesheet" href="/static/style.css">
-</head>
-<body>
-<div class="container">
-    <h2>Owner Login</h2>
+{% extends "base.html" %}
+{% block content %}
 
-    <form method="POST">
-        <input name="username" placeholder="Username" required>
-        <input type="password" name="password" placeholder="Password" required>
-        <button>Login</button>
-    </form>
+<div class="card shadow p-4 mx-auto" style="max-width: 400px;">
+  <h3 class="text-center mb-3">Owner Login</h3>
+
+  <form method="POST">
+    <input class="form-control mb-3" name="username" placeholder="Username" required>
+    <input type="password" class="form-control mb-3" name="password" placeholder="Password" required>
+    <button class="btn btn-dark w-100">Login</button>
+  </form>
 </div>
-</body>
-</html>
+
+{% endblock %}

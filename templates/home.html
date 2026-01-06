@@ -1,16 +1,23 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>PrintHub</title>
-    <link rel="stylesheet" href="/static/style.css">
-</head>
-<body>
-<div class="container">
-    <h1>PrintHub</h1>
-    <p>QR-based Xerox Automation SaaS</p>
+{% extends "base.html" %}
+{% block content %}
 
-    <a href="/register_owner"><button>Register Shop</button></a><br><br>
-    <a href="/login"><button>Owner Login</button></a>
+<div class="row align-items-center">
+  <div class="col-md-6">
+    <h1 class="fw-bold">Smart Xerox Automation</h1>
+    <p class="text-muted mt-3">
+      Let customers upload files, pay digitally, and collect prints.
+      No WhatsApp. No confusion. Just PrintHub.
+    </p>
+
+    <a href="/register_owner" class="btn btn-primary btn-lg mt-3">
+      Register Your Shop
+    </a>
+  </div>
+
+  <div class="col-md-6 text-center">
+    <img src="https://cdn-icons-png.flaticon.com/512/2920/2920222.png"
+         class="img-fluid" width="280">
+  </div>
 </div>
-</body>
-</html>
+
+{% endblock %}
