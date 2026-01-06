@@ -1,38 +1,54 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Owner Dashboard</title>
-</head>
-<body>
+{% extends "base.html" %}
 
-<h1>Orders for {{ owner }}</h1>
+{% block content %}
+<h3 class="mb-3">Orders for {{ owner }}</h3>
 
-{% if orders %}
-    <table border="1" cellpadding="10">
+<table class="table table-bordered table-striped shadow-sm">
+    <thead class="table-dark">
         <tr>
             <th>Customer</th>
             <th>File</th>
-            <th>Print Type</th>
+            <th>Type</th>
             <th>Copies</th>
-            <th>Price (₹)</th>
+            <th>Price</th>
+            <th>Status</th>
+            <th>Txn ID</th>
+            <th>Action</th>
         </tr>
+    </thead>
 
-        {% for order in orders %}
+    <tbody>
+    {% for order in orders %}
         <tr>
             <td>{{ order.customer }}</td>
             <td>{{ order.file }}</td>
             <td>{{ order.print_type }}</td>
             <td>{{ order.copies }}</td>
-            <td>{{ order.price }}</td>
+            <td>₹{{ order.price }}</td>
+
+            <td>
+                {% if order.status == "PAID" %}
+                    <span class="badge bg-success">PAID</span>
+                {% elif order.status == "PAYMENT_INITIATED" %}
+                    <span class="badge bg-warning text-dark">WAITING</span>
+                {% else %}
+                    <span class="badge bg-danger">UNPAID</span>
+                {% endif %}
+            </td>
+
+            <td>{{ order.txn_id or "-" }}</td>
+
+            <td>
+                {% if order.status != "PAID" %}
+                    <a href="/mark_paid/{{ order.id }}" class="btn btn-sm btn-success">
+                        Mark Paid
+                    </a>
+                {% else %}
+                    ✔
+                {% endif %}
+            </td>
         </tr>
-        {% endfor %}
-    </table>
-{% else %}
-    <p>No orders yet.</p>
-{% endif %}
-
-<br>
-<a href="/">Back to Home</a>
-
-</body>
-</html>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
