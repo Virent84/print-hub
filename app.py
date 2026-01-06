@@ -96,10 +96,18 @@ def register_owner():
         qr_path = generate_owner_qr(username)
 
         return f"""
-        <h2>Owner Registered ✅</h2>
-        <p>Scan this QR:</p>
-        <img src='/{qr_path}' width='200'>
-        """
+            <h2>Owner Registered ✅</h2>
+
+            <p><b>Scan this QR for customers:</b></p>
+            <img src='/{qr_path}' width='200'><br><br>
+
+            <hr>
+
+            <p><b>Owner actions:</b></p>
+            <a href="/login">
+                <button style="padding:10px 20px;">Owner Login</button>
+            </a>
+            """
 
     return render_template("register_owner.html")
 
