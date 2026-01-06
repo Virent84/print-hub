@@ -3,6 +3,36 @@ import os
 import sqlite3
 import qrcode
 
+def init_db():
+    conn = sqlite3.connect("printhub.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS owners (
+            username TEXT PRIMARY KEY,
+            password TEXT,
+            bw_price INTEGER,
+            color_price INTEGER,
+            upi_id TEXT
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            owner TEXT,
+            customer_name TEXT,
+            filename TEXT,
+            copies INTEGER,
+            print_type TEXT,
+            amount INTEGER,
+            status TEXT
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
 # ------------------------------------
 # APP CONFIG
 # ------------------------------------
@@ -291,7 +321,7 @@ def generate_upi_qr(owner, amount):
 # ------------------------------------
 if __name__ == "__main__":
     init_db()
-    import os
+    app.run()
 
-port = int(os.environ.get("PORT", 5000))
-app.run(host="0.0.0.0", port=port, debug=False)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
