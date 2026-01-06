@@ -242,11 +242,15 @@ def dashboard(owner):
 
     if owner_data["subscription_status"] != "ACTIVE" and today > owner_data["trial_end"]:
         conn.close()
-        return """
-        <h2>Trial Expired ❌</h2>
-        <p>Your 30-day free trial has ended.</p>
-        <p>Please subscribe for ₹199/month.</p>
-        """
+        return f"""
+            <h2>Trial Expired ❌</h2>
+            <p>Your 30-day free trial has ended.</p>
+            <p>Subscribe for ₹199/month to continue using PrintHub.</p>
+
+            <a href="/subscribe/{owner}">
+                <button style="padding:10px 20px;">Subscribe Now</button>
+            </a>
+            """
 
     orders = conn.execute(
         "SELECT * FROM orders WHERE owner=? ORDER BY id DESC",
@@ -303,6 +307,54 @@ def update_status(order_id, new_status):
     conn.commit()
     conn.close()
     return redirect(request.referrer)
+
+#--------------------------------------------------
+# SUBSCRIPTION UPGRADE
+# --------------------------------------------------
+@app.route("/subscribe/<owner>")
+def subscribe(owner):
+    return f"""
+    <h2>Upgrade Subscription</h2>
+
+    <p><b>Plan:</b> PrintHub Pro</p>
+    <p><b>Price:</b> ₹199 / month</p>
+
+    <ul>
+        <li>Unlimited orders</li>
+        <li>Unlimited customers</li>
+        <li>QR-based automation</li>
+        <li>Order dashboard</li>
+        <li>Priority support</li>
+    </ul>
+
+    <p><b>Payment method (current):</b></p>
+    <p>Pay manually via UPI to PrintHub (during beta)</p>
+
+    <a href="/activate/{owner}">
+        <button style="padding:10px 20px;">I Have Paid</button>
+    </a>
+    """
+
+# --------------------------------------------------
+# ACTIVATE SUBSCRIPTION
+# --------------------------------------------------
+@app.route("/activate/<owner>")
+def activate_subscription(owner):
+    conn = get_db_connection()
+    conn.execute(
+        "UPDATE owners SET subscription_status='ACTIVE' WHERE username=?",
+        (owner,)
+    )
+    conn.commit()
+    conn.close()
+
+    return f"""
+    <h2>Subscription Activated ✅</h2>
+    <p>Thank you for subscribing!</p>
+    <a href="/dashboard/{owner}">
+        <button>Go to Dashboard</button>
+    </a>
+    """
 
 # --------------------------------------------------
 # RUN
