@@ -2,6 +2,7 @@ from flask import Flask, request, redirect
 import sqlite3
 import os
 import qrcode
+from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 
 # --------------------------------------------------
@@ -34,7 +35,9 @@ def init_db():
             password TEXT,
             bw_price INTEGER,
             color_price INTEGER,
-            upi_id TEXT
+            upi_id TEXT,
+            subscription_status TEXT,
+            trial_end TEXT
         )
     """)
 
@@ -54,7 +57,7 @@ def init_db():
     conn.commit()
     conn.close()
 
-# IMPORTANT: must run for Render + Gunicorn
+# MUST run for Render / Gunicorn
 init_db()
 
 # --------------------------------------------------
@@ -75,8 +78,8 @@ def generate_owner_qr(owner):
 @app.route("/")
 def home():
     return """
-    <h1>Welcome to PrintHub</h1>
-    <p>Scan QR → Upload → Pay → Collect Prints</p>
+    <h1>PrintHub</h1>
+    <p>QR-based Xerox Automation SaaS</p>
     <a href="/register_owner">Register Shop</a> |
     <a href="/login">Owner Login</a>
     """
@@ -94,12 +97,13 @@ def register_owner():
         upi_id = request.form.get("upi_id")
 
         password = generate_password_hash(raw_password)
+        trial_end = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
 
         try:
             conn = get_db_connection()
             conn.execute(
-                "INSERT INTO owners VALUES (?, ?, ?, ?, ?)",
-                (username, password, bw_price, color_price, upi_id)
+                "INSERT INTO owners VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (username, password, bw_price, color_price, upi_id, "TRIAL", trial_end)
             )
             conn.commit()
             conn.close()
@@ -109,7 +113,8 @@ def register_owner():
         qr_path = generate_owner_qr(username)
 
         return f"""
-        <h2>Owner Registered ✅</h2>
+        <h2>Shop Registered ✅</h2>
+        <p>Free Trial till: <b>{trial_end}</b></p>
         <p>Customer QR:</p>
         <img src='/{qr_path}' width='200'><br><br>
         <a href="/login"><button>Owner Login</button></a>
@@ -204,7 +209,7 @@ def upload():
         <h2>Payment</h2>
         <p>Amount: ₹{total}</p>
         <p>Pay via UPI: {owner_data['upi_id']}</p>
-        <p><b>Manual confirmation by shop owner</b></p>
+        <p><b>Payment confirmed manually by shop</b></p>
         """
 
     return f"""
@@ -223,11 +228,26 @@ def upload():
     """
 
 # --------------------------------------------------
-# OWNER DASHBOARD (SAAS CORE)
+# OWNER DASHBOARD (SUBSCRIPTION CHECK)
 # --------------------------------------------------
 @app.route("/dashboard/<owner>")
 def dashboard(owner):
     conn = get_db_connection()
+    owner_data = conn.execute(
+        "SELECT * FROM owners WHERE username=?",
+        (owner,)
+    ).fetchone()
+
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    if owner_data["subscription_status"] != "ACTIVE" and today > owner_data["trial_end"]:
+        conn.close()
+        return """
+        <h2>Trial Expired ❌</h2>
+        <p>Your 30-day free trial has ended.</p>
+        <p>Please subscribe for ₹199/month.</p>
+        """
+
     orders = conn.execute(
         "SELECT * FROM orders WHERE owner=? ORDER BY id DESC",
         (owner,)
