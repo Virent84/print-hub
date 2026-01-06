@@ -124,30 +124,78 @@ def login():
             "SELECT * FROM owners WHERE username=? AND password=?",
             (username, password)
         ).fetchone()
+
+        if not owner:
+            conn.close()
+            return "<h3>Invalid username or password ❌</h3>"
+
+        orders = conn.execute(
+            "SELECT * FROM orders WHERE owner=? ORDER BY id DESC",
+            (username,)
+        ).fetchall()
         conn.close()
 
-        if owner:
-            return f"""
-            <h2>Login Successful ✅</h2>
-            <p>Welcome, {username}</p>
-            <p>This is where owner dashboard will come.</p>
-            """
+        html = f"<h2>Owner Dashboard – {username}</h2><hr>"
+
+        if not orders:
+            html += "<p>No orders yet.</p>"
         else:
-            return "<h3>Invalid username or password ❌</h3>"
+            html += """
+            <table border="1" cellpadding="10">
+                <tr>
+                    <th>ID</th>
+                    <th>Customer</th>
+                    <th>File</th>
+                    <th>Copies</th>
+                    <th>Type</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            """
+
+            for order in orders:
+                action = (
+                    f"<a href='/complete/{order['id']}'>Mark Done</a>"
+                    if order["status"] != "Completed"
+                    else "✔"
+                )
+
+                html += f"""
+                <tr>
+                    <td>{order['id']}</td>
+                    <td>{order['customer_name']}</td>
+                    <td>{order['filename']}</td>
+                    <td>{order['copies']}</td>
+                    <td>{order['print_type']}</td>
+                    <td>₹{order['amount']}</td>
+                    <td>{order['status']}</td>
+                    <td>{action}</td>
+                </tr>
+                """
+
+            html += "</table>"
+
+        return html
 
     return """
     <h2>Owner Login</h2>
     <form method="POST">
-        <label>Username:</label><br>
-        <input type="text" name="username" required><br><br>
-
-        <label>Password:</label><br>
-        <input type="password" name="password" required><br><br>
-
+        <input type="text" name="username" placeholder="Username" required><br><br>
+        <input type="password" name="password" placeholder="Password" required><br><br>
         <button type="submit">Login</button>
     </form>
     """
-
+@app.route("/complete/<int:order_id>")
+def complete_order(order_id):
+    conn = get_db_connection()
+    conn.execute(
+        "UPDATE orders SET status='Completed' WHERE id=?",
+        (order_id,)
+    )
+    conn.commit()
+    conn.close()
+    return redirect("/login")
 
 # -------------------- CUSTOMER UPLOAD --------------------
 
