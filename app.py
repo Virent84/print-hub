@@ -111,6 +111,44 @@ def register_owner():
 
     return render_template("register_owner.html")
 
+# -------------------- OWNER LOGIN --------------------
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+
+        conn = get_db_connection()
+        owner = conn.execute(
+            "SELECT * FROM owners WHERE username=? AND password=?",
+            (username, password)
+        ).fetchone()
+        conn.close()
+
+        if owner:
+            return f"""
+            <h2>Login Successful ✅</h2>
+            <p>Welcome, {username}</p>
+            <p>This is where owner dashboard will come.</p>
+            """
+        else:
+            return "<h3>Invalid username or password ❌</h3>"
+
+    return """
+    <h2>Owner Login</h2>
+    <form method="POST">
+        <label>Username:</label><br>
+        <input type="text" name="username" required><br><br>
+
+        <label>Password:</label><br>
+        <input type="password" name="password" required><br><br>
+
+        <button type="submit">Login</button>
+    </form>
+    """
+
+
 # -------------------- CUSTOMER UPLOAD --------------------
 
 @app.route("/upload", methods=["GET", "POST"])
