@@ -1,8 +1,7 @@
-from flask import Flask, render_template, request, redirect, url_for
-import sqlite3, os
+from flask import Flask, request, redirect, render_template
+import sqlite3, os, qrcode
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
-import qrcode
 
 app = Flask(__name__)
 
@@ -13,16 +12,18 @@ QR_FOLDER = "static/qrcodes"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(QR_FOLDER, exist_ok=True)
 
-# ---------------- DB ----------------
-def db():
+# ---------------- DATABASE ----------------
+def get_db():
     conn = sqlite3.connect(DB, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
-    c = db().cursor()
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS owners(
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS owners (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         shop_name TEXT,
         mobile TEXT UNIQUE,
@@ -32,11 +33,13 @@ def init_db():
         print_modes TEXT,
         orientations TEXT,
         sides TEXT,
-        trial_end TEXT
+        trial_end TEXT,
+        created_at TEXT
     )
     """)
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS orders(
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS orders (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         owner_id INTEGER,
         filename TEXT,
@@ -45,17 +48,20 @@ def init_db():
         orientation TEXT,
         sides TEXT,
         pages TEXT,
-        status TEXT
+        status TEXT,
+        created_at TEXT
     )
     """)
-    c.connection.commit()
+
+    conn.commit()
+    conn.close()
 
 init_db()
 
 # ---------------- QR ----------------
 def generate_qr(owner_id):
-    url = request.host_url + f"upload?owner_id={owner_id}"
-    path = f"{QR_FOLDER}/{owner_id}.png"
+    url = request.host_url.rstrip("/") + f"/upload?owner_id={owner_id}"
+    path = f"{QR_FOLDER}/owner_{owner_id}.png"
     qrcode.make(url).save(path)
     return path
 
@@ -64,86 +70,166 @@ def generate_qr(owner_id):
 def home():
     return render_template("home.html")
 
-# ---------- OWNER REGISTER ----------
-@app.route("/register_owner", methods=["GET","POST"])
+# -------- OWNER REGISTER --------
+@app.route("/register_owner", methods=["GET", "POST"])
 def register_owner():
     if request.method == "POST":
-        data = request.form
-        try:
-            db().execute("""
-            INSERT INTO owners VALUES (NULL,?,?,?,?,?,?,?,?)
-            """,(
-                data["shop_name"],
-                data["mobile"],
-                generate_password_hash(data["password"]),
-                data["upi"],
-                ",".join(request.form.getlist("paper")),
-                ",".join(request.form.getlist("mode")),
-                ",".join(request.form.getlist("orientation")),
-                ",".join(request.form.getlist("side")),
-                (datetime.now()+timedelta(days=30)).strftime("%Y-%m-%d")
-            ))
-            db().commit()
-        except:
-            return "Mobile already registered"
+        shop_name = request.form.get("shop_name")
+        mobile = request.form.get("mobile")
+        password = request.form.get("password")
+        upi = request.form.get("upi")
 
-        owner_id = db().execute("SELECT id FROM owners WHERE mobile=?", (data["mobile"],)).fetchone()["id"]
+        paper = ",".join(request.form.getlist("paper"))
+        mode = ",".join(request.form.getlist("mode"))
+        orientation = ",".join(request.form.getlist("orientation"))
+        side = ",".join(request.form.getlist("side"))
+
+        conn = get_db()
+
+        # ✅ SAFE duplicate check
+        existing = conn.execute(
+            "SELECT id FROM owners WHERE mobile=?",
+            (mobile,)
+        ).fetchone()
+
+        if existing:
+            conn.close()
+            return "<h3>❌ Mobile number already registered</h3>"
+
+        conn.execute("""
+        INSERT INTO owners (
+            shop_name, mobile, password, upi,
+            paper_sizes, print_modes, orientations, sides,
+            trial_end, created_at
+        ) VALUES (?,?,?,?,?,?,?,?,?,?)
+        """, (
+            shop_name,
+            mobile,
+            generate_password_hash(password),
+            upi,
+            paper,
+            mode,
+            orientation,
+            side,
+            (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d"),
+            datetime.now().isoformat()
+        ))
+
+        conn.commit()
+
+        owner_id = conn.execute(
+            "SELECT id FROM owners WHERE mobile=?",
+            (mobile,)
+        ).fetchone()["id"]
+
+        conn.close()
+
         qr = generate_qr(owner_id)
-        return f"<h3>Registered</h3><img src='/{qr}' width=200><br><a href='/login'>Login</a>"
+
+        return f"""
+        <h2>Shop Registered ✅</h2>
+        <p>Shop: <b>{shop_name}</b></p>
+        <p>Mobile: <b>{mobile}</b></p>
+        <img src='/{qr}' width='200'><br><br>
+        <a href="/login">Owner Login</a>
+        """
 
     return render_template("register_owner.html")
 
-# ---------- LOGIN ----------
-@app.route("/login", methods=["GET","POST"])
+# -------- LOGIN --------
+@app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        owner = db().execute("SELECT * FROM owners WHERE mobile=?", (request.form["mobile"],)).fetchone()
-        if owner and check_password_hash(owner["password"], request.form["password"]):
-            return redirect(f"/dashboard/{owner['id']}")
-        return "Invalid Login"
+        mobile = request.form.get("mobile")
+        password = request.form.get("password")
+
+        conn = get_db()
+        owner = conn.execute(
+            "SELECT * FROM owners WHERE mobile=?",
+            (mobile,)
+        ).fetchone()
+        conn.close()
+
+        if not owner or not check_password_hash(owner["password"], password):
+            return "<h3>❌ Invalid login</h3>"
+
+        return redirect(f"/dashboard/{owner['id']}")
+
     return render_template("login.html")
 
-# ---------- CUSTOMER UPLOAD ----------
-@app.route("/upload", methods=["GET","POST"])
+# -------- CUSTOMER UPLOAD --------
+@app.route("/upload", methods=["GET", "POST"])
 def upload():
     owner_id = request.args.get("owner_id")
-    owner = db().execute("SELECT * FROM owners WHERE id=?", (owner_id,)).fetchone()
+    if not owner_id:
+        return "<h3>Invalid QR</h3>"
+
+    conn = get_db()
+    owner = conn.execute(
+        "SELECT * FROM owners WHERE id=?",
+        (owner_id,)
+    ).fetchone()
+    conn.close()
+
     if not owner:
-        return "Invalid QR"
+        return "<h3>Owner not found</h3>"
 
     if request.method == "POST":
-        f = request.files["file"]
-        f.save(os.path.join(UPLOAD_FOLDER, f.filename))
+        file = request.files.get("file")
+        if not file:
+            return "<h3>No file uploaded</h3>"
 
-        db().execute("""
-        INSERT INTO orders VALUES (NULL,?,?,?,?,?,?,?,?)
-        """,(
+        filename = file.filename
+        file.save(os.path.join(UPLOAD_FOLDER, filename))
+
+        conn = get_db()
+        conn.execute("""
+        INSERT INTO orders (
+            owner_id, filename, paper_size,
+            print_mode, orientation, sides,
+            pages, status, created_at
+        ) VALUES (?,?,?,?,?,?,?,?,?)
+        """, (
             owner_id,
-            f.filename,
-            request.form["paper"],
-            request.form["mode"],
-            request.form["orientation"],
-            request.form["side"],
-            request.form["pages"],
-            "PAID"
+            filename,
+            request.form.get("paper"),
+            request.form.get("mode"),
+            request.form.get("orientation"),
+            request.form.get("side"),
+            request.form.get("pages"),
+            "PAID",
+            datetime.now().isoformat()
         ))
-        db().commit()
+        conn.commit()
+        conn.close()
 
         return f"""
-        <h2>Payment Page</h2>
-        <p>Pay ₹1 to {owner['upi']}</p>
-        <p><b>Demo Mode – Payment Successful</b></p>
+        <h2>Payment</h2>
+        <p>Pay to UPI: <b>{owner['upi']}</b></p>
+        <p><b>Demo mode – Payment assumed successful</b></p>
         """
 
     return render_template("upload.html", owner=owner)
 
-# ---------- DASHBOARD ----------
-@app.route("/dashboard/<int:oid>")
-def dashboard(oid):
-    owner = db().execute("SELECT * FROM owners WHERE id=?", (oid,)).fetchone()
-    orders = db().execute("SELECT * FROM orders WHERE owner_id=?", (oid,)).fetchall()
+# -------- DASHBOARD --------
+@app.route("/dashboard/<int:owner_id>")
+def dashboard(owner_id):
+    conn = get_db()
+    owner = conn.execute(
+        "SELECT * FROM owners WHERE id=?",
+        (owner_id,)
+    ).fetchone()
+
+    orders = conn.execute(
+        "SELECT * FROM orders WHERE owner_id=? ORDER BY id DESC",
+        (owner_id,)
+    ).fetchall()
+
+    conn.close()
+
     return render_template("dashboard.html", owner=owner, orders=orders)
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5000)))
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
