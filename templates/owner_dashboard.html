@@ -1,45 +1,14 @@
 {% extends "base.html" %}
-{% block content %}
-
-<h3 class="mb-4">Dashboard – {{ owner }}</h3>
-
-{% if orders %}
-<div class="table-responsive">
-<table class="table table-bordered table-hover bg-white">
-  <thead class="table-dark">
-    <tr>
-      <th>ID</th>
-      <th>Customer</th>
-      <th>File</th>
-      <th>Amount</th>
-      <th>Status</th>
-      <th>Actions</th>
-    </tr>
-  </thead>
-
-  <tbody>
-  {% for o in orders %}
-    <tr>
-      <td>{{ o.id }}</td>
-      <td>{{ o.customer_name }}</td>
-      <td>{{ o.filename }}</td>
-      <td>₹{{ o.amount }}</td>
-      <td>
-        <span class="badge bg-info">{{ o.status }}</span>
-      </td>
-      <td>
-        <a class="btn btn-sm btn-success" href="/status/{{ o.id }}/PAID">Paid</a>
-        <a class="btn btn-sm btn-warning" href="/status/{{ o.id }}/PRINTING">Print</a>
-        <a class="btn btn-sm btn-primary" href="/status/{{ o.id }}/READY">Ready</a>
-        <a class="btn btn-sm btn-dark" href="/status/{{ o.id }}/COMPLETED">Done</a>
-      </td>
-    </tr>
-  {% endfor %}
-  </tbody>
+{% block body %}
+<h3>{{owner.shop_name}} Dashboard</h3>
+<table class="table table-bordered">
+<tr><th>File</th><th>Pages</th><th>Status</th></tr>
+{% for o in orders %}
+<tr>
+<td>{{o.filename}}</td>
+<td>{{o.pages}}</td>
+<td>{{o.status}}</td>
+</tr>
+{% endfor %}
 </table>
-</div>
-{% else %}
-<p>No orders yet.</p>
-{% endif %}
-
 {% endblock %}

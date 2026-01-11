@@ -1,18 +1,29 @@
 {% extends "base.html" %}
-{% block content %}
+{% block body %}
+<h3>Register Xerox Shop</h3>
+<form method="post">
+<input name="shop_name" placeholder="Shop Name" class="form-control mb-2">
+<input name="mobile" placeholder="Mobile" class="form-control mb-2">
+<input name="password" type="password" placeholder="Password" class="form-control mb-2">
+<input name="upi" placeholder="UPI ID" class="form-control mb-2">
 
-<div class="card shadow p-4 mx-auto" style="max-width: 500px;">
-  <h3 class="mb-3 text-center">Register Xerox Shop</h3>
+<label>Paper</label><br>
+<input type="checkbox" name="paper" value="A3">A3
+<input type="checkbox" name="paper" value="A4">A4
 
-  <form method="POST">
-    <input class="form-control mb-3" name="username" placeholder="Shop Username" required>
-    <input type="password" class="form-control mb-3" name="password" placeholder="Password" required>
-    <input type="number" class="form-control mb-3" name="bw_price" placeholder="B/W Price (₹)" required>
-    <input type="number" class="form-control mb-3" name="color_price" placeholder="Color Price (₹)" required>
-    <input class="form-control mb-3" name="upi_id" placeholder="UPI ID" required>
+<br><label>Mode</label><br>
+<input type="checkbox" name="mode" value="Normal">Normal
+<input type="checkbox" name="mode" value="Digital">Digital
 
-    <button class="btn btn-primary w-100">Register</button>
-  </form>
-</div>
+<br><label>Orientation</label><br>
+<input type="checkbox" name="orientation" value="Portrait">Portrait
+<input type="checkbox" name="orientation" value="Landscape">Landscape
 
+<br><label>Sides</label><br>
+<input type="checkbox" name="side" value="Single">Single
+<input type="checkbox" name="side" value="Double">Double
+
+<br><br>
+<button class="btn btn-success">Register</button>
+</form>
 {% endblock %}

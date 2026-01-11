@@ -1,21 +1,34 @@
 {% extends "base.html" %}
-{% block content %}
+{% block body %}
+<h3>Upload – {{owner.shop_name}}</h3>
+<form method="post" enctype="multipart/form-data">
+<input type="file" name="file" class="form-control mb-2">
 
-<div class="card shadow p-4 mx-auto" style="max-width: 500px;">
-  <h4 class="mb-3 text-center">Upload for {{ owner }}</h4>
+<select name="paper" class="form-control mb-2">
+{% for p in owner.paper_sizes.split(",") %}
+<option>{{p}}</option>
+{% endfor %}
+</select>
 
-  <form method="POST" enctype="multipart/form-data">
-    <input class="form-control mb-3" name="name" placeholder="Your Name" required>
-    <input type="file" class="form-control mb-3" name="file" required>
-    <input type="number" class="form-control mb-3" name="copies" value="1" min="1">
+<select name="mode" class="form-control mb-2">
+{% for m in owner.print_modes.split(",") %}
+<option>{{m}}</option>
+{% endfor %}
+</select>
 
-    <select class="form-select mb-3" name="print_type">
-      <option value="bw">Black & White</option>
-      <option value="color">Color</option>
-    </select>
+<select name="orientation" class="form-control mb-2">
+{% for o in owner.orientations.split(",") %}
+<option>{{o}}</option>
+{% endfor %}
+</select>
 
-    <button class="btn btn-success w-100">Upload & Continue</button>
-  </form>
-</div>
+<select name="side" class="form-control mb-2">
+{% for s in owner.sides.split(",") %}
+<option>{{s}}</option>
+{% endfor %}
+</select>
 
+<input name="pages" placeholder="All or 1-3,5" class="form-control mb-2">
+<button class="btn btn-primary">Upload</button>
+</form>
 {% endblock %}
