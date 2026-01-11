@@ -1,6 +1,12 @@
 {% extends "base.html" %}
-{% block body %}
-<h1>PrintHub</h1>
-<a href="/register_owner" class="btn btn-primary">Register Shop</a>
-<a href="/login" class="btn btn-secondary">Login</a>
+{% block title %}PrintHub — Smart Printing{% endblock %}
+
+{% block content %}
+<h1>Smart Printing for Every Xerox Shop</h1>
+<p>Scan QR → Upload → Pay → Collect Prints</p>
+
+<div style="margin-top:30px">
+    <a href="/register_owner"><button>Register Your Shop</button></a>
+    <a href="/login"><button style="background:#10b981">Owner Login</button></a>
+</div>
 {% endblock %}

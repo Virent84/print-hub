@@ -1,29 +1,25 @@
 {% extends "base.html" %}
-{% block body %}
-<h3>Register Xerox Shop</h3>
-<form method="post">
-<input name="shop_name" placeholder="Shop Name" class="form-control mb-2">
-<input name="mobile" placeholder="Mobile" class="form-control mb-2">
-<input name="password" type="password" placeholder="Password" class="form-control mb-2">
-<input name="upi" placeholder="UPI ID" class="form-control mb-2">
+{% block content %}
 
-<label>Paper</label><br>
-<input type="checkbox" name="paper" value="A3">A3
-<input type="checkbox" name="paper" value="A4">A4
+<h2>Register Xerox Shop</h2>
 
-<br><label>Mode</label><br>
-<input type="checkbox" name="mode" value="Normal">Normal
-<input type="checkbox" name="mode" value="Digital">Digital
+<form method="POST">
+    <label>Shop Username</label>
+    <input name="username" required>
 
-<br><label>Orientation</label><br>
-<input type="checkbox" name="orientation" value="Portrait">Portrait
-<input type="checkbox" name="orientation" value="Landscape">Landscape
+    <label>Password</label>
+    <input type="password" name="password" required>
 
-<br><label>Sides</label><br>
-<input type="checkbox" name="side" value="Single">Single
-<input type="checkbox" name="side" value="Double">Double
+    <label>B/W Price</label>
+    <input type="number" name="bw_price" required>
 
-<br><br>
-<button class="btn btn-success">Register</button>
+    <label>Color Price</label>
+    <input type="number" name="color_price" required>
+
+    <label>UPI ID</label>
+    <input name="upi_id" required>
+
+    <button type="submit">Register Shop</button>
 </form>
+
 {% endblock %}
