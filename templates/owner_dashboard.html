@@ -1,14 +1,30 @@
 {% extends "base.html" %}
 {% block body %}
-<h3>{{owner.shop_name}} Dashboard</h3>
-<table class="table table-bordered">
-<tr><th>File</th><th>Pages</th><th>Status</th></tr>
-{% for o in orders %}
-<tr>
-<td>{{o.filename}}</td>
-<td>{{o.pages}}</td>
-<td>{{o.status}}</td>
-</tr>
-{% endfor %}
+
+<h3>{{ owner.shop_name }} Dashboard</h3>
+
+{% if orders %}
+<table class="table table-bordered bg-white">
+  <tr>
+    <th>File</th>
+    <th>Paper</th>
+    <th>Mode</th>
+    <th>Pages</th>
+    <th>Status</th>
+  </tr>
+
+  {% for o in orders %}
+  <tr>
+    <td>{{ o.filename }}</td>
+    <td>{{ o.paper_size }}</td>
+    <td>{{ o.print_mode }}</td>
+    <td>{{ o.pages }}</td>
+    <td>{{ o.status }}</td>
+  </tr>
+  {% endfor %}
 </table>
+{% else %}
+<p>No orders yet.</p>
+{% endif %}
+
 {% endblock %}
