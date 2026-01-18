@@ -1,27 +1,25 @@
-from flask import Flask, render_template, request, redirect, url_for
-import sqlite3
-import os
-import qrcode
+from flask import Flask, render_template, request, redirect
+import sqlite3, os, qrcode
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 
 app = Flask(__name__)
 
-DB_NAME = "printhub.db"
+DB = "printhub.db"
 UPLOAD_FOLDER = "uploads"
 QR_FOLDER = "static/qrcodes"
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(QR_FOLDER, exist_ok=True)
 
-# ---------------- DB ----------------
-def get_db():
-    conn = sqlite3.connect(DB_NAME)
+# ---------------- DATABASE ----------------
+def db():
+    conn = sqlite3.connect(DB)
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
-    conn = get_db()
+    conn = db()
     cur = conn.cursor()
 
     cur.execute("""
@@ -45,6 +43,11 @@ def init_db():
         filename TEXT,
         copies INTEGER,
         print_type TEXT,
+        paper_size TEXT,
+        orientation TEXT,
+        sides TEXT,
+        mode TEXT,
+        pages TEXT,
         amount INTEGER,
         status TEXT,
         created_at TEXT
@@ -57,58 +60,57 @@ def init_db():
 init_db()
 
 # ---------------- QR ----------------
-def generate_qr(owner_id):
+def make_qr(owner_id):
     url = request.host_url + f"upload/{owner_id}"
     path = f"{QR_FOLDER}/{owner_id}.png"
     qrcode.make(url).save(path)
-    return path
 
 # ---------------- ROUTES ----------------
 @app.route("/")
 def home():
     return redirect("/register_owner")
 
-# ---------- REGISTER OWNER ----------
-@app.route("/register_owner", methods=["GET", "POST"])
+# -------- OWNER REGISTER --------
+@app.route("/register_owner", methods=["GET","POST"])
 def register_owner():
     if request.method == "POST":
-        shop_name = request.form["shop_name"]
-        mobile = request.form["mobile"]
-        password = generate_password_hash(request.form["password"])
-        bw_price = request.form["bw_price"]
-        color_price = request.form["color_price"]
-        upi_id = request.form["upi_id"]
-
-        conn = get_db()
+        data = request.form
+        conn = db()
         try:
-            cur = conn.cursor()
-            cur.execute("""
+            conn.execute("""
             INSERT INTO owners 
             (shop_name, mobile, password, bw_price, color_price, upi_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (shop_name, mobile, password, bw_price, color_price, upi_id, datetime.now()))
+            VALUES (?,?,?,?,?,?,?)
+            """, (
+                data["shop_name"],
+                data["mobile"],
+                generate_password_hash(data["password"]),
+                data["bw_price"],
+                data["color_price"],
+                data["upi_id"],
+                datetime.now()
+            ))
             conn.commit()
-            owner_id = cur.lastrowid
+            owner_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+            make_qr(owner_id)
         except sqlite3.IntegrityError:
-            conn.close()
             return "Mobile already registered ❌"
         conn.close()
-
-        generate_qr(owner_id)
         return redirect("/login")
 
     return render_template("register_owner.html")
 
-# ---------- LOGIN ----------
-@app.route("/login", methods=["GET", "POST"])
+# -------- OWNER LOGIN --------
+@app.route("/login", methods=["GET","POST"])
 def login():
     if request.method == "POST":
         mobile = request.form["mobile"]
         password = request.form["password"]
 
-        conn = get_db()
+        conn = db()
         owner = conn.execute(
-            "SELECT * FROM owners WHERE mobile=?", (mobile,)
+            "SELECT * FROM owners WHERE mobile=?",
+            (mobile,)
         ).fetchone()
         conn.close()
 
@@ -119,12 +121,13 @@ def login():
 
     return render_template("login.html")
 
-# ---------- CUSTOMER UPLOAD ----------
-@app.route("/upload/<int:owner_id>", methods=["GET", "POST"])
+# -------- CUSTOMER UPLOAD --------
+@app.route("/upload/<int:owner_id>", methods=["GET","POST"])
 def upload(owner_id):
-    conn = get_db()
+    conn = db()
     owner = conn.execute(
-        "SELECT * FROM owners WHERE id=?", (owner_id,)
+        "SELECT * FROM owners WHERE id=?",
+        (owner_id,)
     ).fetchone()
     conn.close()
 
@@ -132,41 +135,54 @@ def upload(owner_id):
         return "Invalid QR ❌"
 
     if request.method == "POST":
-        name = request.form["name"]
-        copies = int(request.form["copies"])
-        print_type = request.form["print_type"]
-        file = request.files["file"]
-
-        if not file:
+        f = request.files["file"]
+        if not f:
             return "No file ❌"
 
-        filename = file.filename
-        file.save(os.path.join(UPLOAD_FOLDER, filename))
+        f.save(os.path.join(UPLOAD_FOLDER, f.filename))
 
+        copies = int(request.form["copies"])
+        print_type = request.form["print_type"]
         price = owner["bw_price"] if print_type == "bw" else owner["color_price"]
         total = price * copies
 
-        conn = get_db()
+        conn = db()
         conn.execute("""
-        INSERT INTO orders 
-        (owner_id, customer_name, filename, copies, print_type, amount, status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (owner_id, name, filename, copies, print_type, total, "CREATED", datetime.now()))
+        INSERT INTO orders
+        (owner_id, customer_name, filename, copies, print_type,
+         paper_size, orientation, sides, mode, pages,
+         amount, status, created_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            owner_id,
+            request.form["name"],
+            f.filename,
+            copies,
+            print_type,
+            request.form["paper_size"],
+            request.form["orientation"],
+            request.form["sides"],
+            request.form["mode"],
+            request.form["pages"],
+            total,
+            "CREATED",
+            datetime.now()
+        ))
         conn.commit()
         conn.close()
 
-        return f"Payment Amount ₹{total} (Demo)"
+        return f"Payment ₹{total} (Demo Mode)"
 
     return render_template("upload.html", owner=owner)
 
-# ---------- DASHBOARD ----------
+# -------- DASHBOARD --------
 @app.route("/dashboard/<int:owner_id>")
 def dashboard(owner_id):
-    conn = get_db()
+    conn = db()
     owner = conn.execute(
-        "SELECT * FROM owners WHERE id=?", (owner_id,)
+        "SELECT * FROM owners WHERE id=?",
+        (owner_id,)
     ).fetchone()
-
     orders = conn.execute(
         "SELECT * FROM orders WHERE owner_id=? ORDER BY id DESC",
         (owner_id,)
@@ -175,10 +191,10 @@ def dashboard(owner_id):
 
     return render_template("dashboard.html", owner=owner, orders=orders)
 
-# ---------- STATUS ----------
+# -------- STATUS UPDATE --------
 @app.route("/status/<int:order_id>/<status>")
-def update_status(order_id, status):
-    conn = get_db()
+def status(order_id, status):
+    conn = db()
     conn.execute(
         "UPDATE orders SET status=? WHERE id=?",
         (status, order_id)
